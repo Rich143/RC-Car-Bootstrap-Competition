@@ -32,15 +32,17 @@ int main(int argc, char** argv) {
         setThrottle(0);   //Note that the first -20%/20% is a safety buffer region. Anything less than 20% is equivalent to no throttle.
         setSteering(0);
 
-        //START TYPING YOUR CODE HERE
+        float time = GPS.time;
 
+        setThrottle(50);
+
+        while (GPS.time < time + 10);
 
         
 //        This is an example of how you can print the GPS time to the debugging interface.
-//        char str[16];
-//        sprintf((char *)&str, "GPS: %f", GPS.time);
-//        debug((char *)&str);
-        
+        char str[16];
+        sprintf((char *)&str, "GPS: %f", GPS.time);
+        debug((char *)&str);
         background();
     }
     return (EXIT_SUCCESS);
