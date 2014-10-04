@@ -22,8 +22,13 @@ _FWDT(FWDTEN_OFF & WDTPOST_PS2048 & WDTPRE_PR128); //32,128
 /*
  * 
  */
+runfor(int time){
+    int starttime = getMin()*60+getSec();
 
-
+    do{
+        background();
+    }while(getMin()*60+getSec()-time <= starttime);
+}
 
 int main(int argc, char** argv) {
     initTruck();
@@ -32,13 +37,27 @@ int main(int argc, char** argv) {
         setThrottle(0);   //Note that the first -20%/20% is a safety buffer region. Anything less than 20% is equivalent to no throttle.
         setSteering(0);
 
-        float time = GPS.time;
+        runfor(2);
+        setThrottle(50);
+        runfor(10);
+
+        setThrottle(0);
+        runfor(2);
+
+        setThrottle(-50);
+        runfor(10);
+
+        setThrottle(0);
+        runfor(2);
 
         setThrottle(50);
+        setSteering(70);
+        runfor(10);
 
-        while (GPS.time < time + 10);
+        setSteering(-70);
+        runfor(10);
 
-        
+        setThrottle(0);
 //        This is an example of how you can print the GPS time to the debugging interface.
         char str[16];
         sprintf((char *)&str, "GPS: %f", GPS.time);
