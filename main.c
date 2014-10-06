@@ -88,7 +88,7 @@ void correctHeading(float heading)
         else
             headingDif += 360; // Correct heading diff since its shorter to turn the other way
     }
-    int steeringCorrection = map(heading - currentHeading, 0, 360, -100, 100) * STEERING_GAIN;
+    int steeringCorrection = map(heading - currentHeading, -180, 180, -100, 100) * STEERING_GAIN;
 }
 void driveForward(float time, float throttlePercent)
 {
