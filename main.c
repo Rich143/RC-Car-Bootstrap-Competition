@@ -23,7 +23,50 @@ _FWDT(FWDTEN_OFF & WDTPOST_PS2048 & WDTPRE_PR128); //32,128
 /*
  * 
  */
+/**********************
+ * PID Calculations   *
+ **********************/
 
+/*
+ * The gains for P, I, and D
+ */
+#define Kp = 1
+#define Ki = 1
+#define Kd = 1
+
+#define dT // The sampling rate of the pidCal
+
+const float maxI = 1;
+
+float pidCal(float setpoint, float actualPosition)
+{
+    //The previous error
+    float preError;
+
+    // calculate the difference between
+    // the desired value and the actual value
+    float error = setpoint - actualPosition;
+
+    // track error over time, scaled to the timer interval
+    float integral = integral + (error * dT);
+
+    if (integral >= maxI) //cap the max contribution from the integral to avoid wind up
+    {
+        integral  = maxI;
+    }
+
+    // determine the amount of change from the last time checked
+    float derivative = (error - preError) / dT;
+
+    // calculate how much to drive the output in order to get to the
+    // desired setpoint.
+    float output = (Kp * error) + (Ki * integral) + (Kd * derivative);
+
+    // remember the error for the next time around.
+    preError = error;
+
+    return output;
+}
 
 /*
  * Prototypes
