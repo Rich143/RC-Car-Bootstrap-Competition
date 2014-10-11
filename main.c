@@ -23,7 +23,51 @@ _FWDT(FWDTEN_OFF & WDTPOST_PS2048 & WDTPRE_PR128); //32,128
 /*
  * 
  */
+/**********************
+ * PID Calculations   *
+ **********************/
 
+//Test
+/*
+ * The gains for P, I, and D
+ */
+#define Kp = 1
+#define Ki = 1
+#define Kd = 1
+
+#define dT // The sampling rate of the pidCal
+
+const float maxI = 1;
+
+float pidCal(float setpoint, float actualPosition)
+{
+    //The previous error
+    float preError;
+
+    // calculate the difference between
+    // the desired value and the actual value
+    float error = setpoint - actualPosition;
+
+    // track error over time, scaled to the timer interval
+    float integral = integral + (error * dT);
+
+    if (integral >= maxI) //cap the max contribution from the integral to avoid wind up
+    {
+        integral  = maxI;
+    }
+
+    // determine the amount of change from the last time checked
+    float derivative = (error - preError) / dT;
+
+    // calculate how much to drive the output in order to get to the
+    // desired setpoint.
+    float output = (Kp * error) + (Ki * integral) + (Kd * derivative);
+
+    // remember the error for the next time around.
+    preError = error;
+
+    return output;
+}
 
 /*
  * Prototypes
@@ -88,7 +132,7 @@ void correctHeading(float heading)
         else
             headingDif += 360; // Correct heading diff since its shorter to turn the other way
     }
-    int steeringCorrection = map(heading - currentHeading, 0, 360, -100, 100) * STEERING_GAIN;
+    int steeringCorrection = map(heading - currentHeading, -180, 180, -100, 100) * STEERING_GAIN;
 }
 void driveForward(float time, float throttlePercent)
 {
