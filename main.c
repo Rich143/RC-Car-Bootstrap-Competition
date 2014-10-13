@@ -27,44 +27,45 @@ _FWDT(FWDTEN_OFF & WDTPOST_PS2048 & WDTPRE_PR128); //32,128
  * PID Calculations   *
  **********************/
 
-//Test
 /*
  * The gains for P, I, and D
  */
-#define Kp = 1
-#define Ki = 1
-#define Kd = 1
+const float Kp = 1;
+const float Ki = 1;
+const float Kd = 1;
 
-#define dT // The sampling rate of the pidCal
+const float dT = 0.01; // The sampling rate of the pidCal
 
-const float maxI = 1;
+float integral;
+float pidError;
+float derivative;
 
-float pidCal(float setpoint, float actualPosition)
-{
-    //The previous error
-    float preError;
+float output;
 
+//The previous error
+float preError;
+
+//should slow down throttle for sharp turn
+//PID control loop. Determines what to set as an output based on the error in the desired control variable
+
+float pidCal(float setpoint, float actualPosition) {
     // calculate the difference between
     // the desired value and the actual value
-    float error = setpoint - actualPosition;
+    pidError = setpoint - actualPosition;
 
     // track error over time, scaled to the timer interval
-    float integral = integral + (error * dT);
-
-    if (integral >= maxI) //cap the max contribution from the integral to avoid wind up
-    {
-        integral  = maxI;
-    }
+    integral += (pidError * dT);
 
     // determine the amount of change from the last time checked
-    float derivative = (error - preError) / dT;
+    derivative = (pidError - preError) / dT;
 
     // calculate how much to drive the output in order to get to the
     // desired setpoint.
-    float output = (Kp * error) + (Ki * integral) + (Kd * derivative);
+    output = (Kp * pidError) + (Ki * integral) + (Kd * derivative);
 
-    // remember the error for the next time around.
-    preError = error;
+    if (output)
+        // remember the error for the next time around.
+        preError = pidError;
 
     return output;
 }
@@ -85,8 +86,8 @@ void updateSeconds();
 void delay(int);
 
 //Maps a number x in input range iStart to iEnd to range oStart to oEnd
-float map(float x, float iStart, float iEnd, float oStart, float oEnd)
-{
+
+float map(float x, float iStart, float iEnd, float oStart, float oEnd) {
     double slope = 1.0 * (oEnd - oStart) / (iEnd - iStart); //calculate the scaling factor
     return (oStart + slope * (x - iStart));
 }
@@ -97,30 +98,31 @@ float map(float x, float iStart, float iEnd, float oStart, float oEnd)
 #define TO_RAD (PI/180)
 #define R_EARTH 6371 //KM
 #define STEERING_GAIN
-float distance(float lat1, float long1, float lat2, float long2)
-{
+
+float distance(float * start, float * end) {
     float dlat, dlong;
-    dlat = (lat1- lat2) * TO_RAD;
-    dlong = (long1 - long2) * TO_RAD;
-    lat1 *= TO_RAD;
-    lat2 *= TO_RAD;
-    long1 *= TO_RAD;
-    long2 *= TO_RAD;
+    dlat = (start[0] - end[0]) * TO_RAD;
+    dlong = (start[1] - end[1]) * TO_RAD;
+    start[0] *= TO_RAD;
+    end[0] *= TO_RAD;
+    start[1] *= TO_RAD;
+    end[1] *= TO_RAD;
 
     float a;
-    a = sin(dlat/2) * sin(dlat/2) + cos(lat1)*cos(lat2)
-        * sin(dlong/2) * sin(dlong/2);
+    a = sin(dlat / 2) * sin(dlat / 2) + cos(start[0]) * cos(end[0])
+            * sin(dlong / 2) * sin(dlong / 2);
     float c;
-    c = 2 * atan2(sqrt(a), sqrt(1-a));
+    c = 2 * atan2(sqrt(a), sqrt(1 - a));
     c *= -1000;
     float d;
     d = R_EARTH * c;
     return d;
 }
 /*
-* Move Functions
-*/
+ * Move Functions
+ */
 
+/*
 void correctHeading(float heading)
 {
     int currentHeading = getHeading(); //find out the current heading
@@ -134,49 +136,49 @@ void correctHeading(float heading)
     }
     int steeringCorrection = map(heading - currentHeading, -180, 180, -100, 100) * STEERING_GAIN;
 }
-void driveForward(float time, float throttlePercent)
-{
+ */
+
+void driveForward(float throttlePercent) {
     setThrottle(throttlePercent);
     setSteering(0);
-    startTimer(drivingTimer, time);
+    // startTimer(drivingTimer, time);
 }
 
-void driveBackward(float time, float throttlePercent)
-{
-    setThrottle(-1*throttlePercent);
+void driveBackward(float throttlePercent) {
+    setThrottle(-1 * throttlePercent);
     setSteering(0);
-    startTimer(drivingTimer, time);
+    // startTimer(drivingTimer, time);
 }
 
-void turn(float time, float throttlePercent, float steeringPercent)
-{
+void turn(float throttlePercent, float steeringPercent) {
     setThrottle(throttlePercent);
     setSteering(steeringPercent);
-    startTimer(drivingTimer, time);
+    // startTimer(drivingTimer, time);
 }
-void driveStop()
-{
+
+void driveStop() {
     setThrottle(0);
 }
 
 
 /*******
-* Timers
-********/
+ * Timers
+ ********/
 double expiryTime[NUMBER_OF_TIMERS];
 boolean expiredTimers[NUMBER_OF_TIMERS];
 
 // Start a timer with that runs for lenght seconds
-void startTimer(Timer timer, float length)
-{
+
+void startTimer(Timer timer, float length) {
     expiryTime[timer] = length + seconds();
 }
 
 // returns true if the timer is expired
-boolean isExpiredTimer(Timer timer)
-{
+
+boolean isExpiredTimer(Timer timer) {
     return (seconds() >= expiryTime[timer]);
 }
+
 /*
 Timer areTimersExpired()
 {
@@ -188,26 +190,27 @@ Timer areTimersExpired()
         }
     }
 }
-*/
+ */
 
-void delay(int delayTime){
+void delay(int delayTime) {
     int waitTime = seconds() + delayTime;
-    while (seconds() <= waitTime)
-    {
-      background();  
+    while (seconds() <= waitTime) {
+        background();
+        setDebugFloat(seconds);
     }
 }
 /*********
-*Time Functions
-*
-**********/
+ *Time Functions
+ *
+ **********/
 
 
 //unsigned long seconds = 0;
 
-unsigned long seconds()
-{
-    return ((int)getSec() + (int)getMin() * 60);
+unsigned long seconds() {
+    return ((int) getSec() + (int) getMin() * 60);
+
+
 }
 
 /*
@@ -215,137 +218,214 @@ void updateSeconds()
 {
     seconds = seconds();
 }
-*/
+ */
 
 
 
 
 MoveState moveState = waitingToStart;
 
-Task task = phase1;
+Task task = phase2;
 
 int main() {
     initTruck();
-    while(true){
+    while (true) {
         //This is how you move the car. Throttle goes from -100% to 100%. Steering goes from -100 to 100%.
-        setThrottle(0);   //Note that the first -20%/20% is a safety buffer region. Anything less than 20% is equivalent to no throttle.
+        setThrottle(0); //Note that the first -20%/20% is a safety buffer region. Anything less than 20% is equivalent to no throttle.
         setSteering(0);
 
-        boolean Done = false;
-        float distanceToTravel = 10; //in meters
+        long double pos[2]; // the current position, must update this manually by calling getPos(pos)
+        long double startPos[2]; // the position the car refers to as its starting position when doing distance calculation, must be set
+        float distTravelled; // the distance the car has travelled calculated by distance()
 
-        long double pos[2];
-        float startPos[2];
-        float distTravelled;
-        switch (task)
-        {
+        moveState = waitingToStart; // the current move state
+        setDebugChar('w');
+        switch (task) {
             case(phase1):
-                driveForward(10,50);
+                driveForward(30);
                 delay(10);
 
                 driveStop();
                 delay(3);
 
-                driveBackward(10,50);
+                driveBackward(30);
                 delay(10);
 
                 driveStop();
                 delay(3);
 
-                turn(10, 50, 40);
+                turn(30, 40);
                 delay(10);
 
                 driveStop();
                 delay(3);
 
-                turn(10, 50, -40);
+                turn(30, -40);
                 delay(10);
                 break;
 
             case(phase2):
+                boolean Done = false;
+                float distanceToTravel = 3; //Distance to travel in phase 2 (meters)
+                setDebugChar('d');
                 delay(2); //delay on startup
-                while(!Done)
-                {
-                    moveState = waitingToStart;
-                     switch (moveState)
-                     {
-                         case(waitingToStart):
-                             if (isGPSLocked())
-                             {
-                                moveState = drivingForward;
-                                driveForward(10, 50);
-
-                                getPosition(pos);
-                                startPos[0] = pos[0];
-                                startPos[1] = pos[1];
-                             }
-                             break;
-
-                         case(drivingForward):
-                            getPosition(pos);
-                            distTravelled = distance(startPos[0], startPos[1], pos[0], pos[1]);
-                            if(distTravelled >= distanceToTravel)
+                while (!Done) {
+                    switch (moveState) {
+                        case(waitingToStart):
+                            setDebugChar('G'); // Print to the debuger to notify waiting for GPS lock
+                            setDebugInt((int) isGPSLocked()); // Print to debugger whether we have gps lock
+                            if (isGPSLocked()) // Wait untill we have gps lock before starting
                             {
-                                driveStop();
-                                delay(2);
-                                moveState = drivingBackward;
-                                getPosition(pos);
-                                startPos[0] = pos[0];
+                                delay(1); // Delay to allow the new debug to print
+
+                                setDebugChar('F'); // debug print that we are driving foward
+                                moveState = drivingForward;
+
+                                getPosition(pos); // update our position
+                                startPos[0] = pos[0]; // Set the start position, held in a long double array of 2
                                 startPos[1] = pos[1];
-                                driveBackward(10, 50);
+
+                                driveForward(25);
                             }
                             break;
 
-                         case(drivingBackward):
+                        case(drivingForward):
+                            getPosition(pos); // update position
+                            distTravelled = distance(startPos, pos); // compute the distance travelled
+                            setDebugFloat(distTravelled); // Print the distance travelled
+                            if (distTravelled >= distanceToTravel) {
+                                driveStop();
+                                setDebugChar('s');
+                                delay(1);
+                                moveState = drivingBackward;
+                                setDebugChar('b');
+
+                                getPosition(pos); // update position
+                                startPos[0] = pos[0]; // set start position
+                                startPos[1] = pos[1];
+
+                                driveBackward(25);
+                            }
+                            break;
+
+                        case(drivingBackward):
                             getPosition(pos);
                             distTravelled = distance(startPos[0], startPos[1], pos[0], pos[1]);
-                            if(distTravelled >= distanceToTravel)
-                            {
+                            setDebugFloat(distTravelled);
+                            if (distTravelled >= distanceToTravel) {
                                 Done = true;
                             }
 
-                     }
+                    }
 
-                     background();
+                    background();
                 }
+                break;
 
             case (phase3):
+                setDebugChar('d');
                 delay(2); //delay on startup
                 Done = false;
-                distanceToTravel = 10; //in meters
-                while(!Done)
-                {
-                    moveState = waitingToStart;
-                     switch (moveState)
-                     {
-                         case(waitingToStart):
-                             if (isGPSLocked())
-                             {
+                moveState = waitingToStart;
+
+                int heading; // The current heading
+                int endHeading; // The desired heading after the turn
+
+                float turnAmount; // What to set steering to based of pidCal
+
+                long nextPidCal = seconds(); // The next time to perform the pid calculation
+                while (!Done) {
+                    switch (moveState) {
+                        case(waitingToStart):
+                            setDebugChar('g');
+                            if (isGPSLocked()) {
+                                setDebugChar('f');
                                 moveState = drivingForward;
-                                driveForward(10, 50);
+                                driveForward(50);
 
                                 getPosition(pos);
                                 startPos[0] = pos[0];
                                 startPos[1] = pos[1];
-                             }
-                             break;
+                            }
+                            break;
 
-                         case(drivingForward):
+                        case(drivingForward):
+                            getPosition(pos); // update position
+                            distTravelled = distance(startPos, pos); // compute the distance travelled
+                            setDebugFloat(distTravelled); // Print the distance travelled
+                            if (distTravelled >= 3) { // Drive Forward 3 meters
+                                driveStop();
+                                setDebugChar('s');
+                                delay(1); // Delay to allow debugs to print
+                                moveState = turningRight;
+                                setDebugChar('r');
+                                endHeading = getHeading() + 90; // Set the heading after the 90? right turn
+                            }
+                            break;
 
-                             break;
-                     }
+                        case(turningRight):
+                            heading = getHeading();
+                            driveForward(30);
+
+                            turnAmount = pidCal(endHeading, heading); // Determine what to steer the car
+                            if (turnAmount > 100)
+                                turnAmount = 100;
+                            else if (turnAmount < -100)
+                                turnAmount = -100;
+                            setSteering(turnAmount); // Set the correct Steerign
+
+                            setDebugFloat(turnAmount); // Print the turnAmount
+                            setDebugInt(heading); // Print the current heading
+
+                            if (heading >= endHeading) {
+                                setSteering(0); // Stop turning
+                                driveStop();
+                                setDebugChar('s');
+                                delay(1);
+                                moveState = turningLeft;
+                                setDebugChar('l');
+                                endHeading = getHeading() - 90;
+                            }
+
+                        case(turningLeft):
+                            heading = getHeading();
+                            driveForward(30);
+
+                            turnAmount = pidCal(endHeading, heading); // Determine what to steer the car
+                            if (turnAmount > 100)
+                                turnAmount = 100;
+                            else if (turnAmount < -100)
+                                turnAmount = -100;
+                            setSteering(turnAmount); // Set the correct Steerign
+
+                            setDebugFloat(turnAmount); // Print the turnAmount
+                            setDebugInt(heading); // Print the current heading
+
+                            if (heading <= endHeading) {
+                                setSteering(0); // Stop turning
+                                driveStop();
+                                setDebugChar('s');
+                                delay(1);
+                                moveState = turningLeft;
+                                setDebugChar('l');
+                                endHeading = getHeading() - 90;
+                            }
+
+
+
+                    }
 
                 }
         }
 
         driveStop();
 
-        while(true);
+        while (true);
 
-//        This is an example of how you can print the GPS time to the debugging interface.
-//        char str[16];
-//        sprintf((char *)&str, "GPS: %f", GPS.time);
-//        debug((char *)&str);
+        //        This is an example of how you can print the GPS time to the debugging interface.
+        //        char str[16];
+        //        sprintf((char *)&str, "GPS: %f", GPS.time);
+        //        debug((char *)&str);
 
         // updateSeconds();
         background();
