@@ -34,7 +34,7 @@ const float Kp = 1;
 const float Ki = 1;
 const float Kd = 1;
 
-const float dT = 0.01; // The sampling rate of the pidCal
+const float dT = 0.000001; // The sampling rate of the pidCal
 
 float integral;
 float pidError;
@@ -265,15 +265,26 @@ int main() {
                 break;
 
             case(phase2):
+
+                int heading; // The current heading
+                int straightHeading; // The desired heading after the turn
+                float turnAmount; // What to set steering to based of pidCal
+
                 boolean Done = false;
+
                 float distanceToTravel = 3; //Distance to travel in phase 2 (meters)
+
                 setDebugChar('d');
+
                 delay(2); //delay on startup
+
                 while (!Done) {
                     switch (moveState) {
                         case(waitingToStart):
+
                             setDebugChar('G'); // Print to the debuger to notify waiting for GPS lock
                             setDebugInt((int) isGPSLocked()); // Print to debugger whether we have gps lock
+
                             if (isGPSLocked()) // Wait untill we have gps lock before starting
                             {
                                 delay(1); // Delay to allow the new debug to print
@@ -286,6 +297,8 @@ int main() {
                                 startPos[1] = pos[1];
 
                                 driveForward(25);
+
+                                straightHeading = getHeading(); //Set the heading for driving straight
                             }
                             break;
 
@@ -293,6 +306,8 @@ int main() {
                             getPosition(pos); // update position
                             distTravelled = distance(startPos, pos); // compute the distance travelled
                             setDebugFloat(distTravelled); // Print the distance travelled
+
+                            // setSteering(pidCal(straightHeading, getHeading()));
                             if (distTravelled >= distanceToTravel) {
                                 driveStop();
                                 setDebugChar('s');
@@ -312,7 +327,12 @@ int main() {
                             getPosition(pos);
                             distTravelled = distance(startPos[0], startPos[1], pos[0], pos[1]);
                             setDebugFloat(distTravelled);
+
+                            // setSteering(pidCal(straightHeading, getHeading()));
+                            
                             if (distTravelled >= distanceToTravel) {
+                                driveStop();
+                                setDebugChar('e');
                                 Done = true;
                             }
 
@@ -333,7 +353,7 @@ int main() {
 
                 float turnAmount; // What to set steering to based of pidCal
 
-                long nextPidCal = seconds(); // The next time to perform the pid calculation
+                //long nextPidCal = seconds(); // The next time to perform the pid calculation
                 while (!Done) {
                     switch (moveState) {
                         case(waitingToStart):
