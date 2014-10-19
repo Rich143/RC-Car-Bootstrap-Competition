@@ -80,8 +80,13 @@
         <targetPluginBoard></targetPluginBoard>
         <platformTool>ICD3PlatformTool</platformTool>
         <languageToolchain>XC16</languageToolchain>
+<<<<<<< HEAD
         <languageToolchainVersion>1.22</languageToolchainVersion>
         <platform>4</platform>
+=======
+        <languageToolchainVersion>1.11</languageToolchainVersion>
+        <platform>2</platform>
+>>>>>>> upstream/master
       </toolsSet>
       <compileType>
         <linkerTool>
@@ -275,7 +280,10 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.end" value="0x2abff"/>
         <property key="memories.programmemory.start" value="0x0"/>
+<<<<<<< HEAD
         <property key="memories.userotp" value="false"/>
+=======
+>>>>>>> upstream/master
         <property key="poweroptions.powerenable" value="false"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>
@@ -284,7 +292,10 @@
         <property key="programoptions.preserveprogramrange.end" value="0x2abff"/>
         <property key="programoptions.preserveprogramrange.start" value="0x0"/>
         <property key="programoptions.preserveuserid" value="false"/>
+<<<<<<< HEAD
         <property key="programoptions.programcalmem" value="false"/>
+=======
+>>>>>>> upstream/master
         <property key="programoptions.testmodeentrymethod" value="VPPFirst"/>
         <property key="programoptions.usehighvoltageonmclr" value="false"/>
         <property key="programoptions.uselvpprogramming" value="false"/>
