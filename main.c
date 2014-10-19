@@ -74,10 +74,10 @@ float pidCal(float setpoint, float actualPosition) {
  * Prototypes
  */
 float map(float, float, float, float, float);
-float distance(float, float, float, float);
-void driveForward(float, float);
-void driveBackward(float, float);
-void turnRight(float, float, float);
+float distance(long double * start, long double * end);
+void driveForward(float);
+void driveBackward(float);
+void turnRight(float, float);
 void driveStop();
 void startTimer(Timer, float);
 boolean isExpiredTimer(Timer);
@@ -99,7 +99,7 @@ float map(float x, float iStart, float iEnd, float oStart, float oEnd) {
 #define R_EARTH 6371 //KM
 #define STEERING_GAIN
 
-float distance(float * start, float * end) {
+float distance(long double * start, long double * end) {
     float dlat, dlong;
     dlat = (start[0] - end[0]) * TO_RAD;
     dlong = (start[1] - end[1]) * TO_RAD;
@@ -192,25 +192,23 @@ Timer areTimersExpired()
 }
  */
 
-void delay(int delayTime) {
-    int waitTime = seconds() + delayTime;
-    while (seconds() <= waitTime) {
-        background();
-        setDebugFloat(seconds);
-    }
-}
 /*********
  *Time Functions
  *
  **********/
 
-
-//unsigned long seconds = 0;
-
 unsigned long seconds() {
     return ((int) getSec() + (int) getMin() * 60);
 
 
+}
+
+void delay(int delayTime) {
+    int waitTime = seconds() + delayTime;
+    while (seconds() <= waitTime) {
+        background();
+        setDebugFloat((float)seconds());
+    }
 }
 
 /*
@@ -240,6 +238,19 @@ int main() {
 
         moveState = waitingToStart; // the current move state
         setDebugChar('w');
+
+        int heading; // The current heading
+        int straightHeading; // The desired heading after the turn
+        float turnAmount; // What to set steering to based of pidCal
+
+        boolean Done = false;
+
+        float distanceToTravel = 3; //Distance to travel in phase 2 (meters)
+
+        setDebugChar('d');
+
+        delay(2); //delay on startup
+
         switch (task) {
             case(phase1):
                 driveForward(30);
@@ -265,18 +276,6 @@ int main() {
                 break;
 
             case(phase2):
-
-                int heading; // The current heading
-                int straightHeading; // The desired heading after the turn
-                float turnAmount; // What to set steering to based of pidCal
-
-                boolean Done = false;
-
-                float distanceToTravel = 3; //Distance to travel in phase 2 (meters)
-
-                setDebugChar('d');
-
-                delay(2); //delay on startup
 
                 while (!Done) {
                     switch (moveState) {
@@ -325,7 +324,7 @@ int main() {
 
                         case(drivingBackward):
                             getPosition(pos);
-                            distTravelled = distance(startPos[0], startPos[1], pos[0], pos[1]);
+                            distTravelled = distance(startPos, pos);
                             setDebugFloat(distTravelled);
 
                             // setSteering(pidCal(straightHeading, getHeading()));
