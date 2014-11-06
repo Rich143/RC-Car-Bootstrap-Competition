@@ -32,7 +32,7 @@ _FWDT(FWDTEN_OFF & WDTPOST_PS2048 & WDTPRE_PR128); //32,128
  */
 const float Kp = 1;
 const float Ki = 1;
-const float Kd = 1;
+const float Kd = 100;
 
 const float dT = 0.000001; // The sampling rate of the pidCal
 
@@ -99,17 +99,22 @@ float map(float x, float iStart, float iEnd, float oStart, float oEnd) {
 #define R_EARTH 6371 //KM
 #define STEERING_GAIN
 
-float distance(long double * start, long double * end) {
-    float dlat, dlong;
-    dlat = (start[0] - end[0]) * TO_RAD;
-    dlong = (start[1] - end[1]) * TO_RAD;
-    start[0] *= TO_RAD;
-    end[0] *= TO_RAD;
-    start[1] *= TO_RAD;
-    end[1] *= TO_RAD;
+struct coord{
+	long double lat;
+	long double lon;
+};
+
+long double distance(struct coord * start, struct coord * end) {
+    long double dlat, dlong;
+    dlat = (start->lat - end->lat) * TO_RAD;
+    dlong = (start->lon - end->lon) * TO_RAD;
+    start->lat *= TO_RAD;
+    end->lat *= TO_RAD;
+    start->lon *= TO_RAD;
+    end->lon *= TO_RAD;
 
     float a;
-    a = sin(dlat / 2) * sin(dlat / 2) + cos(start[0]) * cos(end[0])
+    a = sin(dlat / 2) * sin(dlat / 2) + cos(start->lat) * cos(end->lat)
             * sin(dlong / 2) * sin(dlong / 2);
     float c;
     c = 2 * atan2(sqrt(a), sqrt(1 - a));
@@ -118,6 +123,7 @@ float distance(long double * start, long double * end) {
     d = R_EARTH * c;
     return d;
 }
+
 /*
  * Move Functions
  */
@@ -284,7 +290,7 @@ int main() {
                             setDebugChar('G'); // Print to the debuger to notify waiting for GPS lock
                             setDebugInt((int) isGPSLocked()); // Print to debugger whether we have gps lock
 
-                            if (isGPSLocked()) // Wait untill we have gps lock before starting
+                            if (isGPSLocked()) // Wait until we have gps lock before starting
                             {
                                 delay(1); // Delay to allow the new debug to print
 
