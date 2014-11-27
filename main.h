@@ -46,6 +46,7 @@ typedef enum{
     phase1,
     phase2,
     phase3,
+    test,
 } Task;
 
 

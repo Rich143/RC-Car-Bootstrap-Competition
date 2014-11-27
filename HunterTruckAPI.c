@@ -42,23 +42,16 @@ static void blockForGpsStabilization() {
     int lastTime = getSec();
 
     while (consecutiveSeconds < 5) {
-<<<<<<< HEAD
         setDebugChar(1);
-=======
->>>>>>> master
         int thisTime = getSec();
         int timeDelta = thisTime - lastTime;
         consecutiveSeconds += timeDelta;
         if (lastTime > thisTime || timeDelta > 1 ) {
             consecutiveSeconds = 0;
         }
-<<<<<<< HEAD
         background();
     }
     setDebugChar(0);
-=======
-    }
->>>>>>> master
 }
 
 void initTruck(){

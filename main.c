@@ -1,8 +1,8 @@
 /* 
  * File:   main.c
- * Author: Chris Hajduk
+ * Author: Richard Matthews
  *
- * Created on August 21, 2014, 11:32 PM
+ * Created on November 7, 2014, 11:32 PM
  */
 
 #include <stdio.h>
@@ -20,9 +20,8 @@
 _FOSCSEL(FNOSC_FRC); // Internal FRC oscillator
 _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 _FWDT(FWDTEN_OFF & WDTPOST_PS2048 & WDTPRE_PR128); //32,128
-/*
- * 
- */
+
+
 /**********************
  * PID Calculations   *
  **********************/
@@ -40,15 +39,18 @@ float integral;
 float pidError;
 float derivative;
 
+// the output of the pidCalc
 float output;
 
 //The previous error
 float preError;
 
+
 //should slow down throttle for sharp turn
 //PID control loop. Determines what to set as an output based on the error in the desired control variable
 
-float pidCal(float setpoint, float actualPosition) {
+double pidCal(double setpoint, double actualPosition) {
+
     // calculate the difference between
     // the desired value and the actual value
     pidError = setpoint - actualPosition;
@@ -70,96 +72,132 @@ float pidCal(float setpoint, float actualPosition) {
     return output;
 }
 
-/*
- * Prototypes
- */
-float map(float, float, float, float, float);
-float distance(long double * start, long double * end);
-void driveForward(float);
-void driveBackward(float);
-void turnRight(float, float);
-void driveStop();
-void startTimer(Timer, float);
-boolean isExpiredTimer(Timer);
-unsigned long seconds();
-void updateSeconds();
-void delay(int);
 
-//Maps a number x in input range iStart to iEnd to range oStart to oEnd
+struct Waypoint
+{
+	// Start Point
+	long double startLat;
+	long double startLon;
 
-float map(float x, float iStart, float iEnd, float oStart, float oEnd) {
-    double slope = 1.0 * (oEnd - oStart) / (iEnd - iStart); //calculate the scaling factor
-    return (oStart + slope * (x - iStart));
-}
-
-/*
- * GPS Functions
- */
-#define TO_RAD (PI/180)
-#define R_EARTH 6371 //KM
-#define STEERING_GAIN
-
-struct coord{
+	// Current Position
 	long double lat;
 	long double lon;
+
+	// End Point
+	long double endLat;
+	long double endLon;
+
+	// The original distance to the waypoint
+	long double endDistance;
+
+	// Distance to waypoint
+	long double distanceTraveled;
+
+	// The current heading of the car
+	int curHeading;
+
+	// The desired heading
+	int heading;
+
+	// The value to set the steering to
+	double turnAmount;
 };
 
-long double distance(struct coord * start, struct coord * end) {
-    long double dlat, dlong;
-    dlat = (start->lat - end->lat) * TO_RAD;
-    dlong = (start->lon - end->lon) * TO_RAD;
-    start->lat *= TO_RAD;
-    end->lat *= TO_RAD;
-    start->lon *= TO_RAD;
-    end->lon *= TO_RAD;
 
-    float a;
-    a = sin(dlat / 2) * sin(dlat / 2) + cos(start->lat) * cos(end->lat)
-            * sin(dlong / 2) * sin(dlong / 2);
-    float c;
+/*******************
+ * GPS Functions   *
+ *******************/
+
+
+const long double TO_RAD = PI/180.0;
+const long double R_EARTH = 6371; //KM
+
+// Pass in a waypoint, returns the distance from the start position to the current position
+long double distance(struct Waypoint *point) {
+    long double dLat, dLon, sLat,sLon, eLat, eLon;
+    sLat = point->startLat * TO_RAD;
+    eLat = point->lat * TO_RAD;
+    sLon = point->startLon * TO_RAD;
+    eLon = point->lon * TO_RAD;
+    dLat = eLat - sLat;
+    dLon = eLon - sLon;
+
+    long double a, sin_dLon, sin_dLat;
+    sin_dLon = sin(dLon / 2);
+    sin_dLat = sin(dLat / 2);
+    
+    a = sin_dLat*sin_dLat + cos(sLat)*cos(eLat)*sin_dLon*sin_dLon;
+
+    long double c;
     c = 2 * atan2(sqrt(a), sqrt(1 - a));
     c *= -1000;
-    float d;
+
+    long double d;
     d = R_EARTH * c;
     return d;
 }
 
-/*
- * Move Functions
- */
 
-/*
-void correctHeading(float heading)
+// Pass in a waypoint, and it computes the heading from the starting point to the current point
+// should change to start to end
+double heading(struct Waypoint * point)
 {
-    int currentHeading = getHeading(); //find out the current heading
-    int headingDif = heading - currentHeading;
-    if (abs(headingDif) > 180)  // The max heading difference is 180 since heading is a cirlce
-    {
-        if (headingDif >=0)
-            headingDif -= 360; // Correct heading diff since its shorter to turn the other way
-        else
-            headingDif += 360; // Correct heading diff since its shorter to turn the other way
-    }
-    int steeringCorrection = map(heading - currentHeading, -180, 180, -100, 100) * STEERING_GAIN;
+	long double dLon, sLat,sLon, eLat, eLon;
+    dLon = (point->endLon - point->startLon) * TO_RAD;
+    sLat = point->startLat * TO_RAD;
+    eLat = point->endLat * TO_RAD;
+    sLon = point->startLon * TO_RAD;
+    eLon = point->endLon * TO_RAD;
+
+	double y = sin(dLon) * cos(eLat);
+	double x = cos(sLat) * sin(eLat) - sin(sLat)*cos(eLat)*cos(dLon);
+
+	double heading = atan2(y,x) * (180.0/PI);
+
+	return heading;
 }
- */
+
+
+void setStart(struct Waypoint * point)
+{
+	point->startLon = GPS.longitude;
+	point->startLat = GPS.latitude;
+}
+
+void updatePosition (struct Waypoint * point)
+{
+	point->lon = GPS.longitude;
+	point->lat = GPS.latitude;
+}
+
+void updateDistance(struct Waypoint * point)
+{
+	// Update the current position
+	updatePosition(point);
+
+	// set the new distance to the endpoint
+	point->distanceTraveled = distance(point);
+}
+
+
+/*******************
+ * Move Functions  *
+ *******************/
+
 
 void driveForward(float throttlePercent) {
     setThrottle(throttlePercent);
     setSteering(0);
-    // startTimer(drivingTimer, time);
 }
 
 void driveBackward(float throttlePercent) {
     setThrottle(-1 * throttlePercent);
     setSteering(0);
-    // startTimer(drivingTimer, time);
 }
 
 void turn(float throttlePercent, float steeringPercent) {
     setThrottle(throttlePercent);
     setSteering(steeringPercent);
-    // startTimer(drivingTimer, time);
 }
 
 void driveStop() {
@@ -167,46 +205,12 @@ void driveStop() {
 }
 
 
-/*******
- * Timers
- ********/
-double expiryTime[NUMBER_OF_TIMERS];
-boolean expiredTimers[NUMBER_OF_TIMERS];
-
-// Start a timer with that runs for lenght seconds
-
-void startTimer(Timer timer, float length) {
-    expiryTime[timer] = length + seconds();
-}
-
-// returns true if the timer is expired
-
-boolean isExpiredTimer(Timer timer) {
-    return (seconds() >= expiryTime[timer]);
-}
-
-/*
-Timer areTimersExpired()
-{
-    for (int i = 0; i <= NUMBER_OF_TIMERS; i++)
-    {
-        if(isExpiredTimer(Timer(i)))
-        {
-            expiredTimers[i] = true;
-        }
-    }
-}
- */
-
-/*********
- *Time Functions
- *
- **********/
+/*****************
+ *Time Functions *
+ ****************/
 
 unsigned long seconds() {
     return ((int) getSec() + (int) getMin() * 60);
-
-
 }
 
 void delay(int delayTime) {
@@ -217,243 +221,61 @@ void delay(int delayTime) {
     }
 }
 
-/*
-void updateSeconds()
-{
-    seconds = seconds();
-}
- */
 
-
-
-
-MoveState moveState = waitingToStart;
-
-Task task = phase2;
 
 int main() {
     initTruck();
-    while (true) {
-        //This is how you move the car. Throttle goes from -100% to 100%. Steering goes from -100 to 100%.
+    while (true)
+    {
+
         setThrottle(0); //Note that the first -20%/20% is a safety buffer region. Anything less than 20% is equivalent to no throttle.
         setSteering(0);
 
-        long double pos[2]; // the current position, must update this manually by calling getPos(pos)
-        long double startPos[2]; // the position the car refers to as its starting position when doing distance calculation, must be set
-        float distTravelled; // the distance the car has travelled calculated by distance()
+        // Set the first waypoint
+        struct Waypoint point1; // First waypoint to drive to
+        point1.endDistance = 5; // The distance to travel for phase 2
 
-        moveState = waitingToStart; // the current move state
-        setDebugChar('w');
+        // Wait for gps lock
+        while(!isGPSLocked())
+            background();
 
-        int heading; // The current heading
-        int straightHeading; // The desired heading after the turn
-        float turnAmount; // What to set steering to based of pidCal
+        // Set the startpoint
+        setStart(& point1);
 
-        boolean Done = false;
+        driveForward(25);
 
-        float distanceToTravel = 3; //Distance to travel in phase 2 (meters)
+        // Keep driving until we have reached the first endpoint
+        while (fabsl(point1.distanceTraveled) < point1.endDistance)
+        {
+                updateDistance(& point1); // Find the new distance to the endpoint
 
-        setDebugChar('d');
+                // Send the distance to help with debugging
+                setDebugFloat((float)(point1.distanceTraveled));
+                background();
+        }
 
-        delay(2); //delay on startup
+        // First endpoint reached, reset for the second
+        driveStop();
 
-        switch (task) {
-            case(phase1):
-                driveForward(30);
-                delay(10);
+        setStart(& point1);
 
-                driveStop();
-                delay(3);
+        driveBackward(25);
 
-                driveBackward(30);
-                delay(10);
+        // Keep driving backward until we have reached the second enpoint
+        while (fabsl(point1.distanceTraveled) < point1.endDistance)
+        {
+                updateDistance(& point1);
 
-                driveStop();
-                delay(3);
-
-                turn(30, 40);
-                delay(10);
-
-                driveStop();
-                delay(3);
-
-                turn(30, -40);
-                delay(10);
-                break;
-
-            case(phase2):
-
-                while (!Done) {
-                    switch (moveState) {
-                        case(waitingToStart):
-
-                            setDebugChar('G'); // Print to the debuger to notify waiting for GPS lock
-                            setDebugInt((int) isGPSLocked()); // Print to debugger whether we have gps lock
-
-                            if (isGPSLocked()) // Wait until we have gps lock before starting
-                            {
-                                delay(1); // Delay to allow the new debug to print
-
-                                setDebugChar('F'); // debug print that we are driving foward
-                                moveState = drivingForward;
-
-                                getPosition(pos); // update our position
-                                startPos[0] = pos[0]; // Set the start position, held in a long double array of 2
-                                startPos[1] = pos[1];
-
-                                driveForward(25);
-
-                                straightHeading = getHeading(); //Set the heading for driving straight
-                            }
-                            break;
-
-                        case(drivingForward):
-                            getPosition(pos); // update position
-                            distTravelled = distance(startPos, pos); // compute the distance travelled
-                            setDebugFloat(distTravelled); // Print the distance travelled
-
-                            // setSteering(pidCal(straightHeading, getHeading()));
-                            if (distTravelled >= distanceToTravel) {
-                                driveStop();
-                                setDebugChar('s');
-                                delay(1);
-                                moveState = drivingBackward;
-                                setDebugChar('b');
-
-                                getPosition(pos); // update position
-                                startPos[0] = pos[0]; // set start position
-                                startPos[1] = pos[1];
-
-                                driveBackward(25);
-                            }
-                            break;
-
-                        case(drivingBackward):
-                            getPosition(pos);
-                            distTravelled = distance(startPos, pos);
-                            setDebugFloat(distTravelled);
-
-                            // setSteering(pidCal(straightHeading, getHeading()));
-                            
-                            if (distTravelled >= distanceToTravel) {
-                                driveStop();
-                                setDebugChar('e');
-                                Done = true;
-                            }
-
-                    }
-
-                    background();
-                }
-                break;
-
-            case (phase3):
-                setDebugChar('d');
-                delay(2); //delay on startup
-                Done = false;
-                moveState = waitingToStart;
-
-                int heading; // The current heading
-                int endHeading; // The desired heading after the turn
-
-                float turnAmount; // What to set steering to based of pidCal
-
-                //long nextPidCal = seconds(); // The next time to perform the pid calculation
-                while (!Done) {
-                    switch (moveState) {
-                        case(waitingToStart):
-                            setDebugChar('g');
-                            if (isGPSLocked()) {
-                                setDebugChar('f');
-                                moveState = drivingForward;
-                                driveForward(50);
-
-                                getPosition(pos);
-                                startPos[0] = pos[0];
-                                startPos[1] = pos[1];
-                            }
-                            break;
-
-                        case(drivingForward):
-                            getPosition(pos); // update position
-                            distTravelled = distance(startPos, pos); // compute the distance travelled
-                            setDebugFloat(distTravelled); // Print the distance travelled
-                            if (distTravelled >= 3) { // Drive Forward 3 meters
-                                driveStop();
-                                setDebugChar('s');
-                                delay(1); // Delay to allow debugs to print
-                                moveState = turningRight;
-                                setDebugChar('r');
-                                endHeading = getHeading() + 90; // Set the heading after the 90? right turn
-                            }
-                            break;
-
-                        case(turningRight):
-                            heading = getHeading();
-                            driveForward(30);
-
-                            turnAmount = pidCal(endHeading, heading); // Determine what to steer the car
-                            if (turnAmount > 100)
-                                turnAmount = 100;
-                            else if (turnAmount < -100)
-                                turnAmount = -100;
-                            setSteering(turnAmount); // Set the correct Steerign
-
-                            setDebugFloat(turnAmount); // Print the turnAmount
-                            setDebugInt(heading); // Print the current heading
-
-                            if (heading >= endHeading) {
-                                setSteering(0); // Stop turning
-                                driveStop();
-                                setDebugChar('s');
-                                delay(1);
-                                moveState = turningLeft;
-                                setDebugChar('l');
-                                endHeading = getHeading() - 90;
-                            }
-
-                        case(turningLeft):
-                            heading = getHeading();
-                            driveForward(30);
-
-                            turnAmount = pidCal(endHeading, heading); // Determine what to steer the car
-                            if (turnAmount > 100)
-                                turnAmount = 100;
-                            else if (turnAmount < -100)
-                                turnAmount = -100;
-                            setSteering(turnAmount); // Set the correct Steerign
-
-                            setDebugFloat(turnAmount); // Print the turnAmount
-                            setDebugInt(heading); // Print the current heading
-
-                            if (heading <= endHeading) {
-                                setSteering(0); // Stop turning
-                                driveStop();
-                                setDebugChar('s');
-                                delay(1);
-                                moveState = turningLeft;
-                                setDebugChar('l');
-                                endHeading = getHeading() - 90;
-                            }
-
-
-
-                    }
-
-                }
+                // Send the distance to help with debugging
+                setDebugFloat((float)(point1.distanceTraveled));
+                background();
         }
 
         driveStop();
 
-        while (true);
-
-        //        This is an example of how you can print the GPS time to the debugging interface.
-        //        char str[16];
-        //        sprintf((char *)&str, "GPS: %f", GPS.time);
-        //        debug((char *)&str);
-
-        // updateSeconds();
-        background();
+        while(true);
     }
-    return (EXIT_SUCCESS);
+
+	return 0;
 }
+

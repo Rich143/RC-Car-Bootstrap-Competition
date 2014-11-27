@@ -42,7 +42,7 @@ void getPosition(long double* position){ //must pass in an array[2] to hold posi
     position[0] = GPS.longitude;         // puts lat in [0] and long in [1]
     position[1] = GPS.latitude;
 }
-char isGPSLocked(){   // returns 0 or 1 if locked or not
+char isGPSLocked(){   // returns 0 or 1 if locked or not??
     return GPS.positionFix;
 }
 char getSatellites(){
